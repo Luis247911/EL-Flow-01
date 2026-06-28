@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>n8n-Werkstatt: Close.com → Personio Call-Logging (v4)</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d2991d;
+    --red: #f85149;
+    --orange: #db6d28;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.8rem; margin-bottom: 0.3rem; color: #fff; }
+  h2 { font-size: 1.3rem; margin: 2rem 0 1rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); color: var(--accent); }
+  h3 { font-size: 1.05rem; margin: 1.2rem 0 0.5rem; color: #e6edf3; }
+  .subtitle { color: var(--muted); margin-bottom: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; margin: 0.8rem 0 1.2rem; font-size: 0.9rem; }
+  th, td { padding: 0.55rem 0.75rem; text-align: left; border: 1px solid var(--border); }
+  th { background: var(--surface); font-weight: 600; color: #e6edf3; }
+  tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+  code { background: var(--surface); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--orange); }
+  pre { background: var(--surface); padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5; border: 1px solid var(--border); margin: 0.8rem 0 1.2rem; }
+  .badge { display: inline-block; padding: 0.15em 0.55em; border-radius: 10px; font-size: 0.78rem; font-weight: 600; }
+  .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-yellow { background: rgba(210,153,29,0.15); color: var(--yellow); }
+  .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+  .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .flow { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.7; white-space: pre; overflow-x: auto; margin: 0.8rem 0 1.2rem; }
+  .note { background: rgba(88,166,255,0.08); border-left: 3px solid var(--accent); padding: 0.7rem 1rem; border-radius: 0 6px 6px 0; margin: 1rem 0; font-size: 0.9rem; }
+  .warn { background: rgba(210,153,29,0.08); border-left: 3px solid var(--yellow); padding: 0.7rem 1rem; border-radius: 0 6px 6px 0; margin: 1rem 0; font-size: 0.9rem; }
+  .danger { background: rgba(248,81,73,0.08); border-left: 3px solid var(--red); padding: 0.7rem 1rem; border-radius: 0 6px 6px 0; margin: 1rem 0; font-size: 0.9rem; }
+  ul, ol { margin: 0.5rem 0 0.5rem 1.5rem; }
+  li { margin: 0.2rem 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.3rem; margin: 1.5rem 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc ol { margin-left: 1.2rem; }
+  .score-box { display: inline-block; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.8rem; font-weight: 700; font-size: 1.1rem; }
+  @media print { body { background: #fff; color: #000; } table { border-color: #ccc; } th { background: #eee; color: #000; } .flow, .note, .warn, .danger { background: #f5f5f5; border-color: #ccc; } }
+</style>
+</head>
+<body>
+
+<h1>n8n-Werkstatt: Close.com → Personio Call-Logging</h1>
+<p class="subtitle">Version 4 — 28. Juni 2026 — Autor: Luis Hornburg</p>
+
+<div class="toc">
+<strong>Inhaltsverzeichnis</strong>
+<ol>
+  <li><a href="#p1">Phase 1 — Potenzial-Identifikation</a></li>
+  <li><a href="#p2">Phase 2 — Architektur-Gate</a></li>
+  <li><a href="#p3">Phase 3 — Workflow-Design</a></li>
+  <li><a href="#p4">Phase 4 — Test-Methodik</a></li>
+  <li><a href="#offen">Offene Fragen (vor Bau)</a></li>
+</ol>
+</div>
+
+<hr id="p1">
+
+<h2>Phase 1 — Potenzial-Identifikation</h2>
+
+<table>
+<tr><th>Feld</th><th>Inhalt</th></tr>
+<tr><td><strong>Trigger</strong></td><td>Close.com Webhook bei Call Ended, gefiltert auf Luis' Telefonnummer</td></tr>
+<tr><td><strong>Schritte</strong></td><td>Webhook → Input-Guard → Python-Anonymisierung → Dauer/Länge-Gate → Router (LLM, günstig) → Generator (LLM, Pro/Contra) → Evaluator (Grounding/Format) → Slack-Bot HITL → Personio-E-Mail</td></tr>
+<tr><td><strong>Output</strong></td><td>Personio-E-Mail mit Pro/Contra-Liste + Slack-Fallback-Log + Eval-Log</td></tr>
+<tr><td><strong>Systeme</strong></td><td>Close.com, Personio, Slack, Ollama Cloud API (4 Systeme)</td></tr>
+<tr><td><strong>Datenklassen</strong></td><td>Telefonnummern, Anruf-Metadaten, Transkript (PII-belastet → anonymisiert), LLM-generierte Pro/Contra-Liste, Eval-Log</td></tr>
+</table>
+
+<h3>Scoring</h3>
+<table>
+<tr><th>Achse</th><th>Wert</th><th>Begründung</th></tr>
+<tr><td>Frequenz</td><td><strong>5</strong></td><td>Mehrfach täglich (Recruiting-Calls)</td></tr>
+<tr><td>Zeitersparnis</td><td><strong>2</strong></td><td>1–2 min pro Call (Klickarbeit + manuelles Zusammenfassen)</td></tr>
+<tr><td>Regelhaftigkeit</td><td><strong>3</strong></td><td>Match per Telefonnummer deterministisch; LLM-Kette (Router→Generator→Evaluator) probabilistisch, aber durch HITL abgesichert</td></tr>
+</table>
+
+<p><span class="score-box">Score = 5 × 2 × 3 = 30</span> &nbsp;— solider Kandidat. Score sinkt durch höhere Komplexität, aber Qualitätsgewinn durch Evaluator + HITL rechtfertigt das.</p>
+
+<div class="danger">
+<strong>Datenrisiko-Gate: 🔴 Rot</strong><br>
+Echte Transkripte enthalten PII (Namen, ggf. sensible Details). Python-Anonymisierung ist <strong>harte Privacy-Invariante</strong>: kein Roh-Transkript verlässt den Code-Node. Bau mit Fake-Transkripten; Betrieb nur mit funktionierendem Anonymisierungs-Skript.
+</div>
+
+<hr id="p2">
+
+<h2>Phase 2 — Architektur-Gate</h2>
+
+<h3>Simplicity-First-Triage</h3>
+<table>
+<tr><th>Stufe</th><th>Frage</th><th>Antwort</th></tr>
+<tr><td>(a)</td><td>Ganz ohne LLM?</td><td><strong>Nein.</strong> Transkript-Analyse → strukturierte Pro/Contra-Liste braucht LLM.</td></tr>
+<tr><td>(b)</td><td>Single LLM-Call, kein Agent?</td><td><strong>Nein.</strong> Router + Generator + Evaluator = 3 LLM-Calls. Aber: kein Agent-Loop, kein Tool-Use. Deterministischer Ablauf mit HITL-Gate.</td></tr>
+<tr><td>(c)</td><td>Multi-LLM-Pipeline mit HITL?</td><td><strong>Ja.</strong> Router (günstig) → Generator (stark) → Evaluator (mittel) → Slack HITL. Max 2 Regenerate-Loops.</td></tr>
+</table>
+
+<div class="note">
+<strong>Decision-Record:</strong><br>
+<strong>Pattern: LLM-Augmented Pipeline mit HITL-Gate.</strong> Kein autonomer Agent. Drei LLM-Calls in fester Reihenfolge: Router klassifiziert, Generator produziert, Evaluator prüft. Mensch entscheidet via Slack-Bot (Bestätigen/Ablehnen/Editieren). Kein stiller Write nach Personio — jeder Write ist menschlich autorisiert.
+</div>
+
+<h3>LLM-Modell-Zuordnung</h3>
+<table>
+<tr><th>Stufe</th><th>Modell</th><th>Begründung</th></tr>
+<tr><td>Router</td><td>Kleines Modell</td><td>Nur Klassifikation: tief/kurz/gescheitert + Confidence. Günstig, schnell.</td></tr>
+<tr><td>Generator</td><td>Starkes Modell</td><td>Pro/Contra-Liste mit Kriterien. Braucht Textqualität.</td></tr>
+<tr><td>Evaluator</td><td>Mittleres Modell</td><td>Prüft nur Grounding + Kriterien + Format. Kein Bias/AGG-Check (macht der Mensch).</td></tr>
+</table>
+
+<hr id="p3">
+
+<h2>Phase 3 — Workflow-Design</h2>
+
+<h3>Datenfluss</h3>
+<div class="flow">Close.com Webhook (gefiltert auf Luis' Telefonnummer)
+  │  Transkript (PII-belastet)
+  ▼
+┌─────────────────────────────┐
+│ INPUT-GUARD                 │
+│ Pflichtfelder + Transkript  │
+│ nicht leer                  │
+└─────────────────────────────┘
+  │
+  ▼
+┌─────────────────────────────┐
+│ PYTHON: ANONYMISIERUNG      │  ← Harte Privacy-Invariante
+│ PII → Platzhalter           │     Kein Roh-Transkript verlässt
+│                             │     diesen Node.
+└─────────────────────────────┘
+  │  Anonymisiertes Transkript
+  ▼
+┌─────────────────────────────┐
+│ DAUER/LÄNGE-GATE            │  ← Deterministisch, kein LLM
+│ &lt; 30s / &lt; 200 Zeichen?      │
+│ → Fallback Slack            │
+└─────────────────────────────┘
+  │  Bestanden
+  ▼
+┌─────────────────────────────┐
+│ ROUTER (LLM, günstig)       │
+│ Klassifiziert:              │
+│ tief | kurz | gescheitert   │
+│ + Confidence (0-1)          │
+└─────────────────────────────┘
+  │
+  ├── gescheitert → Slack-Fallback
+  │
+  ├── Confidence &lt; Schwelle → Slack: "Mensch entscheidet Format"
+  │
+  └── tief | kurz + Confidence ok
+        │
+        ▼
+┌─────────────────────────────┐
+│ GENERATOR (LLM, stark)      │
+│ Pro/Contra nach Komprimier- │
+│ ter Master Scorecard +      │
+│ Psychologische Kriterien    │
+│ nach Luis'                  │
+└─────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────┐
+│ EVALUATOR (LLM, mittel)     │
+│ Prüft: Grounding, Kriterien,│
+│ Format (KEIN Bias/AGG)      │
+└─────────────────────────────┘
+        │
+        ├── Fail → Kritik zurück an Generator (max 2×)
+        │         Nach Cap: an Slack mit Eval-Flags
+        │
+        └── Pass
+              │
+              ▼
+┌─────────────────────────────┐
+│ SLACK-BOT (HITL)            │
+│ Vorschlag an Luis:          │
+│ [Bestätigen] [Ablehnen]     │
+│ [Im Thread anpassen]        │
+└─────────────────────────────┘
+        │
+        ├── Bestätigen → Personio-E-Mail
+        ├── Ablehnen → Eval-Log (abgelehnt)
+        └── Thread-Anpassung → Revise-Loop → Generator
+              │
+              ▼
+┌─────────────────────────────┐
+│ PERSONIO-E-MAIL             │
+│ Pro/Contra-Liste landet     │
+│ beim passenden Bewerber     │
+└─────────────────────────────┘</div>
+
+<h3>Input-Guards</h3>
+<table>
+<tr><th>Boundary</th><th>Validator</th><th>on_fail</th></tr>
+<tr><td>Pflichtfelder (Telefonnummer, Transkript, Call-Dauer, Richtung)</td><td>JSON-Schema</td><td><strong>raise</strong> → Error-Workflow</td></tr>
+<tr><td>Transkript vorhanden &amp; nicht leer</td><td>Length &gt; 0</td><td><strong>raise</strong></td></tr>
+<tr><td>Telefonnummer parsebar</td><td>Regex + <code>normalize()</code></td><td><strong>raise</strong></td></tr>
+<tr><td>Injection in Transkript (vor Anonymisierung)</td><td>Pattern-Filter</td><td><strong>filter</strong></td></tr>
+</table>
+
+<h3>Dauer/Länge-Gate (deterministisch)</h3>
+<table>
+<tr><th>Bedingung</th><th>Aktion</th></tr>
+<tr><td>Call-Dauer &lt; 30s ODER Transkript &lt; 200 Zeichen</td><td>→ Slack-Fallback: "Transkript zu kurz/leer"</td></tr>
+<tr><td>Sonst</td><td>→ Weiter zum Router</td></tr>
+</table>
+
+<h3>Telefonnummer-Normalisierung</h3>
+<p><strong>Ausgangslage:</strong> Close.com liefert Nummern mit <code>+49</code>-Präfix, aber die Formatierung variiert — mal mit Leerzeichen (<code>+49 174 1234567</code>), mal ohne (<code>+491741234567</code>), mal inkonsistent (<code>+49 1741234567</code>). Personio hat beliebige Formate, da Bewerber ihre Nummern selbst eingeben (<code>0174...</code>, <code>0049174...</code>, <code>+49 174...</code>, <code>+49174...</code>).</p>
+
+<pre>function normalize(phone):
+    stripped = remove_all(chars=' ()-/.\t', from=phone)
+    
+    if stripped starts with '00':
+        stripped = '+' + stripped[2:]        // 0049... → +49...
+    else if stripped starts with '0':
+        stripped = '+49' + stripped[1:]       // 0174... → +49174...
+    // else: already has + prefix, keep as-is
+    
+    return stripped  // +49174xxxxxxx (E.164, keine Trennzeichen)</pre>
+
+<p>Beide Seiten durchlaufen dieselbe Funktion → Match auf kanonischer Form. Die Normalisierung ist robust gegen alle Close.com-Formatierungsvarianten, da sie alle Nicht-Ziffern-Zeichen entfernt, bevor sie das Präfix normalisiert.</p>
+
+<h3>LLM-Guards</h3>
+<table>
+<tr><th>Guard</th><th>Mechanismus</th></tr>
+<tr><td><strong>PII-Leak</strong></td><td>Python-Anonymisierung VOR allen LLM-Calls. Harte Invariante.</td></tr>
+<tr><td><strong>Router-Halluzination</strong></td><td>Erzwungener JSON-Output: <code>{"classification": "tief"|"kurz"|"gescheitert", "confidence": 0.0-1.0}</code>. Schema-Validierung.</td></tr>
+<tr><td><strong>Generator-Halluzination</strong></td><td>Evaluator prüft Grounding (Behauptungen müssen im Transkript belegbar sein).</td></tr>
+<tr><td><strong>Prompt-Injection via Transkript</strong></td><td>Anonymisierung entfernt Instruction-Muster. System-Prompt/User-Message-Rollentrennung.</td></tr>
+<tr><td><strong>Regenerate-Endlosschleife</strong></td><td>Max 2×. Nach Cap: an Slack mit Eval-Flags, nie still verwerfen.</td></tr>
+<tr><td><strong>LLM-Timeout</strong></td><td>Retry 2× pro Stufe, dann Dead-Letter → Slack.</td></tr>
+</table>
+
+<h3>Output-Guards</h3>
+<table>
+<tr><th>Boundary</th><th>Validator</th><th>on_fail</th></tr>
+<tr><td>Router-Output valides JSON?</td><td>Schema <code>{"classification", "confidence"}</code></td><td><strong>raise</strong> → Retry</td></tr>
+<tr><td>Generator-Output valides JSON?</td><td>Schema <code>{"pro":[], "contra":[], "fazit":""}</code></td><td>Evaluator fängt ab</td></tr>
+<tr><td>Evaluator-Output valides JSON?</td><td>Schema <code>{"pass":bool, "flags":[], "critique":""}</code></td><td><strong>raise</strong> → Retry</td></tr>
+<tr><td>Personio-Match eindeutig?</td><td>count == 1</td><td><strong>refrain</strong> → Slack "manuell prüfen"</td></tr>
+<tr><td>E-Mail-Text-Länge Personio</td><td>Length-Check</td><td><strong>fix</strong> (truncaten)</td></tr>
+</table>
+
+<h3>HITL-Gates</h3>
+<table>
+<tr><th>Write</th><th>Gate?</th><th>Mechanismus</th></tr>
+<tr><td>Personio-E-Mail</td><td><strong>Ja</strong></td><td>Slack-Bot: Bestätigen erforderlich. Kein automatischer Write.</td></tr>
+<tr><td>Slack-Fallback</td><td><strong>Nein</strong></td><td>Fehler/No-Match/gescheitert gehen automatisch in Slack.</td></tr>
+<tr><td>Eval-Log</td><td><strong>Nein</strong></td><td>Jede Approval-Aktion wird automatisch protokolliert.</td></tr>
+</table>
+
+<h3>Eval-Log</h3>
+<table>
+<tr><th>Was wird geloggt?</th><th>Wo?</th></tr>
+<tr><td>Timestamp, Call-ID, Router-Klasse, Confidence</td><td>n8n Data Table</td></tr>
+<tr><td>Evaluator-Ergebnis (pass/fail, flags)</td><td>n8n Data Table</td></tr>
+<tr><td>HITL-Entscheidung (bestätigt/abgelehnt/editiert)</td><td>n8n Data Table</td></tr>
+<tr><td>Editierter Text (bei Thread-Anpassung)</td><td>n8n Data Table</td></tr>
+</table>
+<p>Zweck: Prompt-Tuning + Qualitätsnachweis für Team-Rollout.</p>
+
+<hr id="p4">
+
+<h2>Phase 4 — Test-Methodik</h2>
+
+<h3>Testfälle (22 Stück)</h3>
+<table>
+<tr><th>#</th><th>Fall</th><th>Erwartung</th></tr>
+<tr><td colspan="3"><strong>Happy Path</strong></td></tr>
+<tr><td>1</td><td>Tiefes Transkript, Router: tief/0.9, Generator ok, Evaluator pass, HITL bestätigt</td><td>Personio-E-Mail ✅</td></tr>
+<tr><td>2</td><td>Kurzes Transkript, Router: kurz/0.85, Generator Minimal-Notiz, Evaluator pass, HITL bestätigt</td><td>Personio-E-Mail (Minimal) ✅</td></tr>
+<tr><td colspan="3"><strong>Router</strong></td></tr>
+<tr><td>3</td><td>Router: gescheitert/0.95</td><td>Slack-Fallback, kein Generator-Call</td></tr>
+<tr><td>4</td><td>Router: tief/0.4 (niedrige Confidence)</td><td>Slack: "Mensch entscheidet Format"</td></tr>
+<tr><td colspan="3"><strong>Evaluator</strong></td></tr>
+<tr><td>5</td><td>Evaluator: fail (Grounding), 1× Regenerate → pass</td><td>Personio-E-Mail ✅</td></tr>
+<tr><td>6</td><td>Evaluator: fail 2×, nach Cap</td><td>Slack mit Eval-Flags, kein Personio-Write</td></tr>
+<tr><td colspan="3"><strong>HITL</strong></td></tr>
+<tr><td>7</td><td>Slack: Ablehnen</td><td>Eval-Log "abgelehnt", kein Personio-Write</td></tr>
+<tr><td>8</td><td>Slack: Thread-Anpassung → Revise → Generator → neuer Vorschlag</td><td>Personio-E-Mail mit angepasstem Text ✅</td></tr>
+<tr><td colspan="3"><strong>Dauer/Länge-Gate</strong></td></tr>
+<tr><td>9</td><td>Call &lt; 30s</td><td>Slack-Fallback, kein LLM-Call</td></tr>
+<tr><td>10</td><td>Transkript &lt; 200 Zeichen</td><td>Slack-Fallback, kein LLM-Call</td></tr>
+<tr><td colspan="3"><strong>Nummern-Normalisierung</strong></td></tr>
+<tr><td>11a</td><td>Personio: <code>0174 1234567</code> → Close: <code>+49 174 1234567</code></td><td>Match ✅</td></tr>
+<tr><td>11b</td><td>Personio: <code>00491741234567</code> → Close: <code>+49 174 1234567</code></td><td>Match ✅</td></tr>
+<tr><td>11c</td><td>Personio: <code>+49 174-1234567</code> → Close: <code>+49 174 1234567</code></td><td>Match ✅</td></tr>
+<tr><td>11d</td><td>Personio: <code>+491741234567</code> → Close: <code>+49 174 1234567</code></td><td>Match ✅</td></tr>
+<tr><td>11e</td><td>Personio: <code>0174 1234567</code> → Close: <code>+491741234567</code> (Close ohne Leerzeichen)</td><td>Match ✅</td></tr>
+<tr><td>11f</td><td>Personio: <code>0174 1234567</code> → Close: <code>+49 1741234567</code> (Close inkonsistent)</td><td>Match ✅</td></tr>
+<tr><td colspan="3"><strong>Edge Cases</strong></td></tr>
+<tr><td>12</td><td>No-Match (Nummer nicht in Personio)</td><td>Slack "manuell prüfen"</td></tr>
+<tr><td>13</td><td>Mehrfach-Match (Bewerber auf mehreren Stellen)</td><td>Slack-Nachricht mit allen Matches: "Das Interview habe ich für Stelle X mit dem Bewerber geführt" → direkte Zuordnung möglich, kein Blocker</td></tr>
+<tr><td>14</td><td>Kein Transkript im Webhook</td><td>raise → Error-Workflow</td></tr>
+<tr><td>15</td><td>Leeres Transkript</td><td>raise → Error-Workflow</td></tr>
+<tr><td>16</td><td>Router-Timeout</td><td>Retry 2× → Dead-Letter Slack</td></tr>
+<tr><td>17</td><td>Generator-Timeout</td><td>Retry 2× → Dead-Letter Slack</td></tr>
+<tr><td>18</td><td>Personio-API down</td><td>Retry 3× → Dead-Letter</td></tr>
+<tr><td>19</td><td>Slack-API down</td><td>Retry 3× → Dead-Letter</td></tr>
+<tr><td colspan="3"><strong>Security</strong></td></tr>
+<tr><td>20</td><td>PII im Transkript → Anonymisierung greift</td><td>Kein PII im LLM-Prompt ✅</td></tr>
+<tr><td>21</td><td>Prompt-Injection im Transkript</td><td>Anonymisierung + Rollentrennung fängt ab</td></tr>
+<tr><td>22</td><td>HTML/JS in Call-Notizen</td><td>Gefiltert</td></tr>
+</table>
+
+<h3>Schwellen</h3>
+<table>
+<tr><th>Kategorie</th><th>Schwelle</th></tr>
+<tr><td>Sicherheits-Fälle (20–22)</td><td><strong>100%</strong></td></tr>
+<tr><td>Gesamt</td><td><strong>≥90%</strong> (20/22)</td></tr>
+</table>
+
+<hr id="offen">
+
+<h2>Offene Fragen (vor Bau)</h2>
+
+<table>
+<tr><th>#</th><th>Frage</th><th>Status</th></tr>
+<tr><td>1</td><td><strong>Router-Modell:</strong> Welches Ollama-Modell für "günstig"?</td><td><span class="badge badge-yellow">Offen</span></td></tr>
+<tr><td>2</td><td><strong>Slack-Bot:</strong> Wie funktioniert aktuell der Slack-Bot? Wie können Thread-Antworten wieder nach n8n für Anpassungsanweisungen etc. gelangen?</td><td><span class="badge badge-yellow">Offen</span></td></tr>
+<tr><td>3</td><td><strong>Confidence-Schwelle Router:</strong> Ab welchem Wert "niedrig"? 0.6? 0.7?</td><td><span class="badge badge-yellow">Offen</span></td></tr>
+<tr><td>4</td><td><strong>Eval-Log-Ziel:</strong> n8n Data Table ausreichend oder extern (Sheet/DB)?</td><td><span class="badge badge-yellow">Offen</span></td></tr>
+</table>
+
+<hr>
+
+<p style="text-align:center; color: var(--muted); font-size: 0.85rem; margin-top: 2rem;">n8n-Werkstatt v4 — Erstellt mit Odysseus — 28. Juni 2026</p>
+
+</body>
+</html>
